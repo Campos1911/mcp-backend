@@ -36,7 +36,8 @@
     "@prisma/client": "^7.0.0",
     "@prisma/adapter-better-sqlite3": "^7.0.0",
     "class-validator": "^0.14.1",
-    "class-transformer": "^0.5.1"
+    "class-transformer": "^0.5.1",
+    "@nestjs/throttler": "^6.4.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

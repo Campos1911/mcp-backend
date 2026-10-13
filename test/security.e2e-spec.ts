@@ -151,6 +151,25 @@ describe('Suíte de Testes de Segurança (e2e)', () => {
 
       expect(response.body.errorCode).toBe('INVALID_TOKEN');
     });
+
+    it('Deve bloquear tentativas repetidas de força bruta no login com 429 (Rate Limiting)', async () => {
+      // 5 tentativas consecutivas com credenciais incorretas (limite configurado: 5 por minuto)
+      for (let i = 0; i < 5; i++) {
+        await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: 'user_a@seguranca.com', password: 'senhaErrada123' })
+          .expect(401);
+      }
+
+      // A 6ª tentativa imediata DEVE ser travada pelo ThrottlerGuard com 429
+      const response = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'user_a@seguranca.com', password: 'senhaErrada123' })
+        .expect(429);
+
+      expect(response.body.errorCode).toBe('TOO_MANY_REQUESTS');
+      expect(response.body.statusCode).toBe(429);
+    });
   });
 
   describe('3. Validação de Limites e Proteção contra DoS na Paginação', () => {

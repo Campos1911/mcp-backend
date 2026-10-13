@@ -65,6 +65,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         return 'NOT_FOUND';
       case HttpStatus.CONFLICT:
         return 'CONFLICT';
+      case HttpStatus.TOO_MANY_REQUESTS:
+        return 'TOO_MANY_REQUESTS';
       default:
         return 'HTTP_ERROR';
     }
