@@ -1,0 +1,16 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-backend-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - JWT_SECRET=mcp-backend-super-secret-key-12345
+    volumes:
+      - ./prisma:/app/prisma
+    restart: unless-stopped
