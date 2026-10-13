@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, HttpStatus } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Task, TaskPriority, TaskStatus } from './entities/task.entity.js';
 import { CreateTaskDto } from './dto/create-task.dto.js';
 import { UpdateTaskDto } from './dto/update-task.dto.js';
+import { AppException } from '../common/exceptions/app-exception.js';
 
 @Injectable()
 export class TasksService {
@@ -42,16 +43,28 @@ export class TasksService {
   findOne(id: string): Task {
     const task = this.tasks.find((t) => t.id === id);
     if (!task) {
-      throw new NotFoundException('Tarefa com ID ' + id + ' não encontrada');
+      throw new AppException(
+        'TASK_NOT_FOUND',
+        'Tarefa com ID ' + id + ' não encontrada',
+        HttpStatus.NOT_FOUND,
+      );
     }
     return task;
   }
 
   create(dto: CreateTaskDto): Task {
+    if (!dto.title || dto.title.trim().length === 0) {
+      throw new AppException(
+        'TASK_TITLE_REQUIRED',
+        'O título da tarefa é obrigatório',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const now = new Date().toISOString();
     const newTask: Task = {
       id: randomUUID(),
-      title: dto.title,
+      title: dto.title.trim(),
       description: dto.description,
       status: 'PENDING',
       priority: dto.priority ?? 'MEDIUM',
@@ -65,7 +78,16 @@ export class TasksService {
 
   update(id: string, dto: UpdateTaskDto): Task {
     const task = this.findOne(id);
-    if (dto.title !== undefined) task.title = dto.title;
+    if (dto.title !== undefined) {
+      if (dto.title.trim().length === 0) {
+        throw new AppException(
+          'TASK_TITLE_EMPTY',
+          'O título da tarefa não pode ser vazio',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      task.title = dto.title.trim();
+    }
     if (dto.description !== undefined) task.description = dto.description;
     if (dto.status !== undefined) task.status = dto.status;
     if (dto.priority !== undefined) task.priority = dto.priority;
@@ -76,7 +98,11 @@ export class TasksService {
   remove(id: string): { success: boolean; message: string } {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) {
-      throw new NotFoundException('Tarefa com ID ' + id + ' não encontrada');
+      throw new AppException(
+        'TASK_NOT_FOUND',
+        'Tarefa com ID ' + id + ' não encontrada',
+        HttpStatus.NOT_FOUND,
+      );
     }
     this.tasks.splice(index, 1);
     return { success: true, message: 'Tarefa ' + id + ' removida com sucesso' };
