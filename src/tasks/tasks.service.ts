@@ -1,17 +1,16 @@
 import { Injectable, HttpStatus } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-import { Task, TaskPriority, TaskStatus } from './entities/task.entity.js';
-import { CreateTaskDto } from './dto/create-task.dto.js';
-import { UpdateTaskDto } from './dto/update-task.dto.js';
-import { FindTasksQueryDto } from './dto/find-tasks-query.dto.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import type { CreateTaskDto } from './dto/create-task.dto.js';
+import type { UpdateTaskDto } from './dto/update-task.dto.js';
+import type { FindTasksQueryDto } from './dto/find-tasks-query.dto.js';
 import { AppException } from '../common/exceptions/app-exception.js';
 import type { PaginatedResult } from '../common/interfaces/paginated-result.interface.js';
 
 @Injectable()
 export class TasksService {
-  private tasks: Task[] = [];
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll(userId: string, query?: FindTasksQueryDto): PaginatedResult<Task> {
+  async findAll(userId: string, query?: FindTasksQueryDto): Promise<PaginatedResult<any>> {
     const rawPage = query?.page ?? 1;
     const rawLimit = query?.limit ?? 10;
 
@@ -27,28 +26,29 @@ export class TasksService {
     }
 
     const safeLimit = Math.min(limit, 100);
+    const skip = (page - 1) * safeLimit;
 
-    let filtered = this.tasks.filter((task) => task.userId === userId);
-
-    if (query?.status) {
-      filtered = filtered.filter((task) => task.status === query.status);
-    }
-    if (query?.priority) {
-      filtered = filtered.filter((task) => task.priority === query.priority);
-    }
+    const where: any = { userId };
+    if (query?.status) where.status = query.status;
+    if (query?.priority) where.priority = query.priority;
     if (query?.search) {
-      const term = query.search.toLowerCase();
-      filtered = filtered.filter(
-        (task) =>
-          task.title.toLowerCase().includes(term) ||
-          (task.description && task.description.toLowerCase().includes(term)),
-      );
+      where.OR = [
+        { title: { contains: query.search } },
+        { description: { contains: query.search } },
+      ];
     }
 
-    const totalItems = filtered.length;
+    const [data, totalItems] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
     const totalPages = Math.ceil(totalItems / safeLimit) || 1;
-    const startIndex = (page - 1) * safeLimit;
-    const data = filtered.slice(startIndex, startIndex + safeLimit);
 
     return {
       data,
@@ -63,8 +63,10 @@ export class TasksService {
     };
   }
 
-  findOne(userId: string, id: string): Task {
-    const task = this.tasks.find((t) => t.id === id && t.userId === userId);
+  async findOne(userId: string, id: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id, userId },
+    });
     if (!task) {
       throw new AppException(
         'TASK_NOT_FOUND',
@@ -75,7 +77,7 @@ export class TasksService {
     return task;
   }
 
-  create(userId: string, dto: CreateTaskDto): Task {
+  async create(userId: string, dto: CreateTaskDto) {
     if (!dto.title || dto.title.trim().length === 0) {
       throw new AppException(
         'TASK_TITLE_REQUIRED',
@@ -84,24 +86,20 @@ export class TasksService {
       );
     }
 
-    const now = new Date().toISOString();
-    const newTask: Task = {
-      id: randomUUID(),
-      userId,
-      title: dto.title.trim(),
-      description: dto.description,
-      status: 'PENDING',
-      priority: dto.priority ?? 'MEDIUM',
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    this.tasks.push(newTask);
-    return newTask;
+    return this.prisma.task.create({
+      data: {
+        userId,
+        title: dto.title.trim(),
+        description: dto.description,
+        status: 'PENDING',
+        priority: dto.priority ?? 'MEDIUM',
+      },
+    });
   }
 
-  update(userId: string, id: string, dto: UpdateTaskDto): Task {
-    const task = this.findOne(userId, id);
+  async update(userId: string, id: string, dto: UpdateTaskDto) {
+    await this.findOne(userId, id);
+
     if (dto.title !== undefined) {
       if (dto.title.trim().length === 0) {
         throw new AppException(
@@ -110,34 +108,33 @@ export class TasksService {
           HttpStatus.BAD_REQUEST,
         );
       }
-      task.title = dto.title.trim();
     }
-    if (dto.description !== undefined) task.description = dto.description;
-    if (dto.status !== undefined) task.status = dto.status;
-    if (dto.priority !== undefined) task.priority = dto.priority;
-    task.updatedAt = new Date().toISOString();
-    return task;
+
+    const data: any = {};
+    if (dto.title !== undefined) data.title = dto.title.trim();
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.priority !== undefined) data.priority = dto.priority;
+
+    return this.prisma.task.update({
+      where: { id },
+      data,
+    });
   }
 
-  remove(userId: string, id: string): { success: boolean; message: string } {
-    const index = this.tasks.findIndex((t) => t.id === id && t.userId === userId);
-    if (index === -1) {
-      throw new AppException(
-        'TASK_NOT_FOUND',
-        'Tarefa com ID ' + id + ' não encontrada',
-        HttpStatus.NOT_FOUND,
-      );
-    }
-    this.tasks.splice(index, 1);
+  async remove(userId: string, id: string) {
+    await this.findOne(userId, id);
+    await this.prisma.task.delete({ where: { id } });
     return { success: true, message: 'Tarefa ' + id + ' removida com sucesso' };
   }
 
-  getStats(userId: string) {
-    const userTasks = this.tasks.filter((t) => t.userId === userId);
-    const total = userTasks.length;
-    const pending = userTasks.filter((t) => t.status === 'PENDING').length;
-    const inProgress = userTasks.filter((t) => t.status === 'IN_PROGRESS').length;
-    const completed = userTasks.filter((t) => t.status === 'COMPLETED').length;
+  async getStats(userId: string) {
+    const [total, pending, inProgress, completed] = await Promise.all([
+      this.prisma.task.count({ where: { userId } }),
+      this.prisma.task.count({ where: { userId, status: 'PENDING' } }),
+      this.prisma.task.count({ where: { userId, status: 'IN_PROGRESS' } }),
+      this.prisma.task.count({ where: { userId, status: 'COMPLETED' } }),
+    ]);
 
     return {
       total,

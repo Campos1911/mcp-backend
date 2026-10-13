@@ -3,9 +3,11 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter.js';
+import { PrismaService } from '../src/prisma/prisma.service.js';
 
 describe('Suíte de Testes de Segurança (e2e)', () => {
   let app: INestApplication;
+  let prisma: PrismaService;
   let tokenUserA: string;
   let tokenUserB: string;
   let userATaskId: string;
@@ -18,6 +20,10 @@ describe('Suíte de Testes de Segurança (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();
+
+    prisma = app.get(PrismaService);
+    await prisma.task.deleteMany();
+    await prisma.user.deleteMany();
 
     // 1. Cadastrar Usuário A (Vítima)
     const regResA = await request(app.getHttpServer())
@@ -155,14 +161,12 @@ describe('Suíte de Testes de Segurança (e2e)', () => {
         .set('Authorization', 'Bearer ' + tokenUserA)
         .expect(404);
 
-      // Deve respeitar o formato de erro sanitizado
       expect(response.body).toHaveProperty('success', false);
       expect(response.body).toHaveProperty('errorCode');
       expect(response.body).toHaveProperty('message');
       expect(response.body).toHaveProperty('path');
       expect(response.body).toHaveProperty('timestamp');
 
-      // Não deve vazar detalhes internos
       expect(response.body.stack).toBeUndefined();
       expect(response.body.trace).toBeUndefined();
       expect(JSON.stringify(response.body)).not.toContain('/home/');
