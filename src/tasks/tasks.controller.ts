@@ -10,9 +10,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service.js';
-import type { CreateTaskDto } from './dto/create-task.dto.js';
-import type { UpdateTaskDto } from './dto/update-task.dto.js';
-import type { TaskPriority, TaskStatus } from './entities/task.entity.js';
+import { CreateTaskDto } from './dto/create-task.dto.js';
+import { UpdateTaskDto } from './dto/update-task.dto.js';
+import { FindTasksQueryDto } from './dto/find-tasks-query.dto.js';
 import { JwtAuthGuard, type AuthenticatedUser } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 
@@ -29,19 +29,9 @@ export class TasksController {
   @Get()
   findAll(
     @CurrentUser() user: AuthenticatedUser,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: TaskStatus,
-    @Query('priority') priority?: TaskPriority,
-    @Query('search') search?: string,
+    @Query() query: FindTasksQueryDto,
   ) {
-    return this.tasksService.findAll(user.sub, {
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      status,
-      priority,
-      search,
-    });
+    return this.tasksService.findAll(user.sub, query);
   }
 
   @Get(':id')

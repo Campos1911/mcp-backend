@@ -1,8 +1,8 @@
 import { Injectable, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { CreateTaskDto } from './dto/create-task.dto.js';
-import type { UpdateTaskDto } from './dto/update-task.dto.js';
-import type { FindTasksQueryDto } from './dto/find-tasks-query.dto.js';
+import { CreateTaskDto } from './dto/create-task.dto.js';
+import { UpdateTaskDto } from './dto/update-task.dto.js';
+import { FindTasksQueryDto } from './dto/find-tasks-query.dto.js';
 import { AppException } from '../common/exceptions/app-exception.js';
 import type { PaginatedResult } from '../common/interfaces/paginated-result.interface.js';
 
@@ -11,20 +11,8 @@ export class TasksService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(userId: string, query?: FindTasksQueryDto): Promise<PaginatedResult<any>> {
-    const rawPage = query?.page ?? 1;
-    const rawLimit = query?.limit ?? 10;
-
-    const page = Number(rawPage);
-    const limit = Number(rawLimit);
-
-    if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
-      throw new AppException(
-        'INVALID_PAGINATION_PARAMS',
-        'Os parâmetros "page" e "limit" devem ser números inteiros maiores que zero',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 10;
     const safeLimit = Math.min(limit, 100);
     const skip = (page - 1) * safeLimit;
 
@@ -78,14 +66,6 @@ export class TasksService {
   }
 
   async create(userId: string, dto: CreateTaskDto) {
-    if (!dto.title || dto.title.trim().length === 0) {
-      throw new AppException(
-        'TASK_TITLE_REQUIRED',
-        'O título da tarefa é obrigatório',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     return this.prisma.task.create({
       data: {
         userId,
@@ -99,16 +79,6 @@ export class TasksService {
 
   async update(userId: string, id: string, dto: UpdateTaskDto) {
     await this.findOne(userId, id);
-
-    if (dto.title !== undefined) {
-      if (dto.title.trim().length === 0) {
-        throw new AppException(
-          'TASK_TITLE_EMPTY',
-          'O título da tarefa não pode ser vazio',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    }
 
     const data: any = {};
     if (dto.title !== undefined) data.title = dto.title.trim();

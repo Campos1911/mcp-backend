@@ -1,9 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe, HttpStatus } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
+import { AppException } from '../src/common/exceptions/app-exception.js';
 
 describe('Suíte de Testes de Segurança (e2e)', () => {
   let app: INestApplication;
@@ -19,6 +20,24 @@ describe('Suíte de Testes de Segurança (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     app.useGlobalFilters(new HttpExceptionFilter());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        exceptionFactory: (errors) => {
+          const hasPagination = errors.some((e) => e.property === 'page' || e.property === 'limit');
+          const formatted = errors
+            .map((e) => Object.values(e.constraints || {}))
+            .flat();
+
+          return new AppException(
+            hasPagination ? 'INVALID_PAGINATION_PARAMS' : 'VALIDATION_ERROR',
+            formatted.length === 1 ? formatted[0] : formatted.join(', '),
+            HttpStatus.BAD_REQUEST,
+          );
+        },
+      }),
+    );
     await app.init();
 
     prisma = app.get(PrismaService);
