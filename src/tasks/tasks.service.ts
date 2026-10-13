@@ -3,34 +3,64 @@ import { randomUUID } from 'node:crypto';
 import { Task, TaskPriority, TaskStatus } from './entities/task.entity.js';
 import { CreateTaskDto } from './dto/create-task.dto.js';
 import { UpdateTaskDto } from './dto/update-task.dto.js';
+import { FindTasksQueryDto } from './dto/find-tasks-query.dto.js';
 import { AppException } from '../common/exceptions/app-exception.js';
+import type { PaginatedResult } from '../common/interfaces/paginated-result.interface.js';
 
 @Injectable()
 export class TasksService {
   private tasks: Task[] = [];
 
-  findAll(
-    userId: string,
-    filters?: { status?: TaskStatus; priority?: TaskPriority; search?: string },
-  ): Task[] {
-    let result = this.tasks.filter((task) => task.userId === userId);
+  findAll(userId: string, query?: FindTasksQueryDto): PaginatedResult<Task> {
+    const rawPage = query?.page ?? 1;
+    const rawLimit = query?.limit ?? 10;
 
-    if (filters?.status) {
-      result = result.filter((task) => task.status === filters.status);
+    const page = Number(rawPage);
+    const limit = Number(rawLimit);
+
+    if (isNaN(page) || page < 1 || isNaN(limit) || limit < 1) {
+      throw new AppException(
+        'INVALID_PAGINATION_PARAMS',
+        'Os parâmetros "page" e "limit" devem ser números inteiros maiores que zero',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    if (filters?.priority) {
-      result = result.filter((task) => task.priority === filters.priority);
+
+    const safeLimit = Math.min(limit, 100);
+
+    let filtered = this.tasks.filter((task) => task.userId === userId);
+
+    if (query?.status) {
+      filtered = filtered.filter((task) => task.status === query.status);
     }
-    if (filters?.search) {
-      const term = filters.search.toLowerCase();
-      result = result.filter(
+    if (query?.priority) {
+      filtered = filtered.filter((task) => task.priority === query.priority);
+    }
+    if (query?.search) {
+      const term = query.search.toLowerCase();
+      filtered = filtered.filter(
         (task) =>
           task.title.toLowerCase().includes(term) ||
           (task.description && task.description.toLowerCase().includes(term)),
       );
     }
 
-    return result;
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / safeLimit) || 1;
+    const startIndex = (page - 1) * safeLimit;
+    const data = filtered.slice(startIndex, startIndex + safeLimit);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit: safeLimit,
+        totalItems,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 
   findOne(userId: string, id: string): Task {

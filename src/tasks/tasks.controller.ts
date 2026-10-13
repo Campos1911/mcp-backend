@@ -29,11 +29,19 @@ export class TasksController {
   @Get()
   findAll(
     @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
     @Query('status') status?: TaskStatus,
     @Query('priority') priority?: TaskPriority,
     @Query('search') search?: string,
   ) {
-    return this.tasksService.findAll(user.sub, { status, priority, search });
+    return this.tasksService.findAll(user.sub, {
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      status,
+      priority,
+      search,
+    });
   }
 
   @Get(':id')
