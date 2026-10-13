@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: mcp-backend-prod
     ports:
-      - '3001:3000'
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -13,4 +13,10 @@ services:
       - JWT_SECRET=mcp-backend-super-secret-key-12345
     volumes:
       - ./prisma:/app/prisma
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r => process.exit(r.ok ? 0 : 1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped

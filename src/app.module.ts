@@ -5,20 +5,22 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { TasksModule } from './tasks/tasks.module.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { HealthModule } from './health/health.module.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([
       {
         name: 'default',
-        ttl: 60000, // 1 minuto
-        limit: 100, // 100 requisições por minuto no geral
+        ttl: 60000,
+        limit: 100,
       },
     ]),
     PrismaModule,
     TasksModule,
     UsersModule,
     AuthModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [
