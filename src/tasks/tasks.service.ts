@@ -7,20 +7,13 @@ import { AppException } from '../common/exceptions/app-exception.js';
 
 @Injectable()
 export class TasksService {
-  private tasks: Task[] = [
-    {
-      id: randomUUID(),
-      title: 'Aprender conceitos do MCP',
-      description: 'Estudar ferramentas (Tools), recursos (Resources) e prompts',
-      status: 'IN_PROGRESS',
-      priority: 'HIGH',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  private tasks: Task[] = [];
 
-  findAll(filters?: { status?: TaskStatus; priority?: TaskPriority; search?: string }): Task[] {
-    let result = [...this.tasks];
+  findAll(
+    userId: string,
+    filters?: { status?: TaskStatus; priority?: TaskPriority; search?: string },
+  ): Task[] {
+    let result = this.tasks.filter((task) => task.userId === userId);
 
     if (filters?.status) {
       result = result.filter((task) => task.status === filters.status);
@@ -40,8 +33,8 @@ export class TasksService {
     return result;
   }
 
-  findOne(id: string): Task {
-    const task = this.tasks.find((t) => t.id === id);
+  findOne(userId: string, id: string): Task {
+    const task = this.tasks.find((t) => t.id === id && t.userId === userId);
     if (!task) {
       throw new AppException(
         'TASK_NOT_FOUND',
@@ -52,7 +45,7 @@ export class TasksService {
     return task;
   }
 
-  create(dto: CreateTaskDto): Task {
+  create(userId: string, dto: CreateTaskDto): Task {
     if (!dto.title || dto.title.trim().length === 0) {
       throw new AppException(
         'TASK_TITLE_REQUIRED',
@@ -64,6 +57,7 @@ export class TasksService {
     const now = new Date().toISOString();
     const newTask: Task = {
       id: randomUUID(),
+      userId,
       title: dto.title.trim(),
       description: dto.description,
       status: 'PENDING',
@@ -76,8 +70,8 @@ export class TasksService {
     return newTask;
   }
 
-  update(id: string, dto: UpdateTaskDto): Task {
-    const task = this.findOne(id);
+  update(userId: string, id: string, dto: UpdateTaskDto): Task {
+    const task = this.findOne(userId, id);
     if (dto.title !== undefined) {
       if (dto.title.trim().length === 0) {
         throw new AppException(
@@ -95,8 +89,8 @@ export class TasksService {
     return task;
   }
 
-  remove(id: string): { success: boolean; message: string } {
-    const index = this.tasks.findIndex((t) => t.id === id);
+  remove(userId: string, id: string): { success: boolean; message: string } {
+    const index = this.tasks.findIndex((t) => t.id === id && t.userId === userId);
     if (index === -1) {
       throw new AppException(
         'TASK_NOT_FOUND',
@@ -108,11 +102,12 @@ export class TasksService {
     return { success: true, message: 'Tarefa ' + id + ' removida com sucesso' };
   }
 
-  getStats() {
-    const total = this.tasks.length;
-    const pending = this.tasks.filter((t) => t.status === 'PENDING').length;
-    const inProgress = this.tasks.filter((t) => t.status === 'IN_PROGRESS').length;
-    const completed = this.tasks.filter((t) => t.status === 'COMPLETED').length;
+  getStats(userId: string) {
+    const userTasks = this.tasks.filter((t) => t.userId === userId);
+    const total = userTasks.length;
+    const pending = userTasks.filter((t) => t.status === 'PENDING').length;
+    const inProgress = userTasks.filter((t) => t.status === 'IN_PROGRESS').length;
+    const completed = userTasks.filter((t) => t.status === 'COMPLETED').length;
 
     return {
       total,
