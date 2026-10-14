@@ -1,124 +1,186 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Enterprise NestJS Backend & Model Context Protocol (MCP) Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+[![Node.js Version](https://img.shields.io/badge/Node.js-v24-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![NestJS Version](https://img.shields.io/badge/NestJS-v12-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![Prisma Version](https://img.shields.io/badge/Prisma-v7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![MCP](https://img.shields.io/badge/Protocol-MCP-4B32C3)](https://modelcontextprotocol.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+A production-grade backend and autonomous **Model Context Protocol (MCP)** server built with **NestJS 12**, **Node.js 24**, and **Prisma 7**.
 
-## Description
+This repository showcases a dual architecture: an enterprise REST API with rigorous security defenses and an integrated MCP stdio server designed to connect large language models (**Claude Desktop**, **Cursor**, **Windsurf**) directly to private business logic.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 🏛️ System Architecture
 
-```bash
-$ npm install
+```text
+┌────────────────────────────────────────────────────────┐
+│                   AI Clients & LLMs                    │
+│        (Claude Desktop / Cursor IDE / Windsurf)        │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            │ stdio (JSON-RPC)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                   MCP Stdio Server                     │
+│  • Tools: list_tasks, create_task, update_task_status  │
+│  • Resource: tasks://stats                             │
+│  • Prompt: planejar_dia                                │
+│  • Auto-Healing JWT Session Manager                    │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            │ HTTP + Bearer Token
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                   NestJS 12 Backend                    │
+│  • Global Sanitization (ValidationPipe + Whitelist)    │
+│  • Rate Limiting / Anti-Brute-Force (ThrottlerGuard)   │
+│  • JWT Auth Guard + @CurrentUser Decorator             │
+│  • Strict Multi-Tenant Data Isolation (Zero BOLA)      │
+│  • Health Check & Observability (/health)              │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            │ Prisma 7 (Driver Adapter)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                  SQLite Database Disk                  │
+│               (prisma/dev.db Persistent)               │
+└────────────────────────────────────────────────────────┘
 ```
 
-## Compile and run the project
+---
+
+## ✨ Engineering Highlights
+
+* **Model Context Protocol (MCP):** Exposes tools with pagination support, context resources, and structured prompt templates over `stdio` using `@modelcontextprotocol/sdk` and `zod`.
+* **Zero BOLA / IDOR:** Strict tenant data isolation enforced at the database query level. Users cannot access, modify, or infer resources belonging to other tenants.
+* **Persistent Relational DB:** Powered by **Prisma 7** using the modern driver adapter (`@prisma/adapter-better-sqlite3`) with automatic schema synchronization.
+* **Brute-Force & DoS Protection:** `@nestjs/throttler` guards with strict per-IP rate limits on sensitive endpoints (max 5 login attempts/minute).
+* **Enterprise Validation:** Global `ValidationPipe` combined with `class-validator` and `class-transformer` stripping unwhitelisted properties to prevent Mass Assignment.
+* **Standardized Error Handling:** Global exception filter intercepting errors into predictable envelopes (`{ success, statusCode, errorCode, message, path, timestamp }`), completely preventing stack trace or internal path leaks.
+* **Liveness & Readiness Probes:** `/health` check powered by `@nestjs/terminus` verifying database connection and memory heap consumption.
+* **Automated Security E2E Suite:** 12+ comprehensive end-to-end test scenarios asserting auth integrity, token tampering prevention, rate limit enforcement, and isolation guarantees.
+* **Multi-Stage Containerization:** Optimized `Dockerfile` and `docker-compose.yml` with health checks and persistent volume mounting.
+
+---
+
+## 🚀 Quickstart
+
+### Option A: Running with Docker Compose (Recommended)
 
 ```bash
-# development
-$ npm run start
+# Build and run container in detached mode
+docker compose up --build -d
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# Check running container health
+docker compose ps
 ```
 
-## Run tests
+### Option B: Running Locally
+
+**Prerequisites:** Node.js 24+ and npm.
 
 ```bash
-# unit tests
-$ npm run test
+# 1. Install dependencies
+npm install
 
-# e2e tests
-$ npm run test:e2e
+# 2. Push schema to local SQLite database
+npm run db:push
 
-# test coverage
-$ npm run test:cov
+# 3. Start development server
+npm run start:dev
 ```
 
-## Deployment
+The server will be listening at `http://localhost:3000`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 🤖 Running the MCP Server
+
+The MCP server connects local AI clients to the backend via `stdio`.
+
+### 1. Test via MCP Inspector (Official GUI)
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# In a separate terminal while backend is running:
+npm run inspector
+```
+Open the generated local URL in your browser to inspect tools, prompts, and resources.
+
+### 2. Configure in Claude Desktop
+
+Add this server to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "task-manager-backend": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/TO/teste-mcp-backend/dist/mcp.js"]
+    }
+  }
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 3. Configure in Cursor IDE
 
-## Observability
+Go to **Settings $\rightarrow$ Features $\rightarrow$ MCP $\rightarrow$ Add New MCP Server**:
+* **Name:** `tasks-backend`
+* **Type:** `command`
+* **Command:** `node /ABSOLUTE/PATH/TO/teste-mcp-backend/dist/mcp.js`
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+---
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+## 📡 API Endpoints
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+### Authentication
+| Method | Endpoint | Description | Rate Limit |
+|---|---|---|---|
+| `POST` | `/auth/register` | Register new user and returns JWT token | 10 req/min |
+| `POST` | `/auth/login` | Authenticate and returns JWT token | 5 req/min |
 
-To add it to this project:
+### Tasks (Protected - Requires `Authorization: Bearer <token>`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/tasks?page=1&limit=10` | List authenticated user's tasks with pagination |
+| `GET` | `/tasks/:id` | Get details of a specific task |
+| `POST` | `/tasks` | Create a new task |
+| `PATCH` | `/tasks/:id` | Update task status or fields |
+| `DELETE` | `/tasks/:id` | Remove task |
+| `GET` | `/tasks/stats` | Aggregate completion metrics and counts |
+
+### Observability
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness probe (Prisma DB status + Memory heap) |
+
+---
+
+## 🧪 Testing
+
+Run the automated test suite:
 
 ```bash
-$ npm install @nestjs/observe
+# Run End-to-End & Security test suite
+npm run test:e2e
+
+# Run with verbose details
+npm run test:e2e -- --verbose
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/overview) - it takes a single import and an app key.
+---
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+## 🔒 Security Best Practices Implemented
 
-## Resources
+* **Strict Input Whitelisting:** Prevents malicious payload injections.
+* **Tamper-Proof JWT:** Validates cryptographic signature and expiration on every protected request.
+* **Resource Enumeration Defense:** Returns `404 TASK_NOT_FOUND` rather than `403 FORBIDDEN` on unauthorized ID lookups to eliminate resource enumeration.
+* **Upper Limit Bounds:** Restricts pagination `limit` to a maximum of 100 items to defend against heap exhaustion (DoS).
+* **AI Security Isolation:** MCP tools do not expose tenant IDs to model prompts; authentication context is sealed within the transport JWT.
 
-Check out a few resources that may come in handy when working with NestJS:
+---
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## 📄 License
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is licensed under the [MIT License](LICENSE).
